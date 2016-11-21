@@ -60,16 +60,45 @@ public class Mage : PT_MonoBehaviour
 
     public float activeScreenWidth = 1; // % of the screen to use
 
-    public float speed = 2; // The speed at which _Magee walks
-    
+    public float speed = 2; // The speed at which _Mage walks
+
+    public GameObject[] elementPrefabs; // The Element_Sphere Prefabs
+    public float elementRotDist = 0.5f; // Radius of rotation
+    public float elementRotSpeed = 0.5f;// Period of rotation
+    public int maxNumSelectedElements = 1;
+    public Color[] elementColors;
+
+    // These set the min and max distance between two line points
+    public float lineMinDelta = 0.1f;
+    public float lineMaxDelta = 0.5f;
+    public float lineMaxLength = 8f;
+
+    public GameObject earthGroundSpellPrefab;
+    public GameObject waterGroundSpellPrefab;
+    public GameObject airGroundSpellPrefab;
+    public GameObject fireGroundSpellPrefab;
+    public GameObject aetherGroundSpellPrefab;
+
     public bool ________________;
+
+    protected Transform spellAnchor; // The parent transform for all spells
+
+
+    public float totalLineLength;
+
+    public List<Vector3> linePts; // Points to be shown in the line
+    protected LineRenderer liner; // Ref to the LineRenderer Component
+    protected float lineZ = -0.1f; // Z depth of the line
 
     public MPhase mPhase = MPhase.idle;
     public List<MouseInfo> mouseInfos = new List<MouseInfo>();
+    public string actionStartTag; // ["Mage", "Ground", "Enemy"]
 
     public bool walking = false;
     public Vector3 walkTarget;
     public Transform characterTrans;
+
+    public List<Element> selectedElements = new List<Element>();
 
     void Awake()
     {
@@ -78,6 +107,16 @@ public class Mage : PT_MonoBehaviour
 
         // Find the characterTrans to rotate with Face()
         characterTrans = transform.Find("CharacterTrans");
+
+        // Get the LineRenderer component and disable it
+        liner = GetComponent<LineRenderer>();
+        liner.enabled = false;
+
+
+        GameObject saGO = new GameObject("Spell Anchor");
+        // ^ Create an empty GameObject named "Spell Anchor". When you create a
+        //    new GameObject this way, it's at P:[0,0,0] R:[0,0,0] S:[1,1,1]
+        spellAnchor = saGO.transform; // Get its transform
     }
 
     void Update()
@@ -126,16 +165,22 @@ public class Mage : PT_MonoBehaviour
             }
             else if (Time.time - mouseInfos[0].time > mTapTime)
             {
-                // If it's been down longer than a tap, this may be a drag, but
-                //  to be a drag, it must also have moved a certain number of
-                //  pixels on screen.
+                // If it's been down longer than a tap, this may be a drag, but to be a drag, it must also have moved a certain number of pixels on screen.
                 float dragDist = (lastMouseInfo.screenLoc -
                                   mouseInfos[0].screenLoc).magnitude;
                 if (dragDist >= mDragDist)
                 {
                     mPhase = MPhase.drag;
                 }
+
+                // However, drag will immediately start after mTapTime if there are no elements selected.
+                if (selectedElements.Count == 0)
+                {
+                    mPhase = MPhase.drag;
+                }
             }
+            OrbitSelectedElements();
+
         }
 
         if (mPhase == MPhase.drag)
@@ -197,6 +242,21 @@ public class Mage : PT_MonoBehaviour
     {
         // The mouse was pressed on something (it could be a drag or tap)
         if (DEBUG) print("Mage.MouseDown()");
+
+        GameObject clickedGO = mouseInfos[0].hitInfo.collider.gameObject;
+        // ^ If the mouse wasn't clicked on anything, this would throw an error because hitInfo would be null. However, we know that MouseDown()
+        //  is only called when the mouse WAS clicking on something, so hitInfo is guaranteed to be defined.
+
+        GameObject taggedParent = Utils.FindTaggedParent(clickedGO);
+        if (taggedParent == null)
+        {
+            actionStartTag = "";
+        }
+        else
+        {
+            actionStartTag = taggedParent.tag;
+            // ^ this should be either "Ground", "Mage", or "Enemy"
+        }
     }
 
     void MouseTap()
@@ -204,9 +264,17 @@ public class Mage : PT_MonoBehaviour
         // Something was tapped like a button
         if (DEBUG) print("Mage.MouseTap()");
 
-        WalkTo(lastMouseInfo.loc); // Walk to the latest mouseInfo pos
-        ShowTap(lastMouseInfo.loc); // Show where the player tapped
-
+        // Now this cares what was tapped
+        switch (actionStartTag) {
+        case "Mage":
+            // Do nothing
+            break;
+        case "Ground":
+            // Move to tapped point @ z=0 whether or not an element is selected
+            WalkTo(lastMouseInfo.loc); // Walk to the first mouseInfo pos
+            ShowTap(lastMouseInfo.loc); // Show where the player tapped
+            break;
+        }
     }
 
     void MouseDrag()
@@ -214,32 +282,123 @@ public class Mage : PT_MonoBehaviour
         // The mouse is being drug across something
         if (DEBUG) print("Mage.MouseDrag()");
 
-        // Continuously walk toward the current mouseInfo pos
-        WalkTo(mouseInfos[mouseInfos.Count - 1].loc);
+        // Drag is meaningless unless the mouse started on the ground
+        if (actionStartTag != "Ground") return;
+
+        // If there is no element selected, the player should follow the mouse
+        if (selectedElements.Count == 0)
+        {
+            // Continuously walk toward the current mouseInfo pos
+            WalkTo(mouseInfos[mouseInfos.Count - 1].loc);
+        }
+        else
+        {
+            // This is a ground spell, so we need to draw a line
+            AddPointToLiner(mouseInfos[mouseInfos.Count - 1].loc);
+            // ^ add the most recent MouseInfo.loc to liner
+        }
+
     }
 
     void MouseDragUp()
     {
         // The mouse is released after being drug
         if (DEBUG) print("Mage.MouseDragUp()");
-        // Stop walking when the drag is stopped
-        StopWalking();
+        // Drag is meaningless unless the mouse started on the ground
+        if (actionStartTag != "Ground") return;
+
+        // If there is no element selected, stop walking now
+        if (selectedElements.Count == 0)
+        {
+            // Stop walking when the drag is stopped
+            StopWalking();
+        } else {
+            CastGroundSpell();
+
+            // Clear the liner
+            ClearLiner();
+        }
     }
+
+    void CastGroundSpell()
+    {
+        // There is not a no-element ground spell, so return
+        if (selectedElements.Count == 0) return;
+
+        // Because this version of the prototype only allows a single element to
+        //  be selected, we can use that 0th element to pick the spell.
+        switch (selectedElements[0].type)
+        {
+
+            case ElementType.earth:
+                GameObject earthGO;
+                foreach (Vector3 pt in linePts)
+                { 
+                    earthGO = Instantiate(earthGroundSpellPrefab) as GameObject;
+                    earthGO.transform.parent = spellAnchor;
+                    earthGO.transform.position = pt;
+                }
+                break;
+
+            case ElementType.water:
+                GameObject waterGO;
+                foreach (Vector3 pt in linePts)
+                { 
+                    waterGO = Instantiate(waterGroundSpellPrefab) as GameObject;
+                    waterGO.transform.parent = spellAnchor;
+                    waterGO.transform.position = pt;
+                }
+                break;
+
+            case ElementType.air:
+                GameObject airGO;
+                foreach (Vector3 pt in linePts)
+                { 
+                    airGO = Instantiate(airGroundSpellPrefab) as GameObject;
+                    airGO.transform.parent = spellAnchor;
+                    airGO.transform.position = pt;
+                }
+                break;
+
+            case ElementType.fire:
+                GameObject fireGO;
+                foreach (Vector3 pt in linePts)
+                { 
+                    fireGO = Instantiate(fireGroundSpellPrefab) as GameObject;
+                    fireGO.transform.parent = spellAnchor;
+                    fireGO.transform.position = pt;
+                }
+                break;
+
+            case ElementType.aether:
+                GameObject aetherGO;
+                foreach (Vector3 pt in linePts)
+                { 
+                    aetherGO = Instantiate(aetherGroundSpellPrefab) as GameObject;
+                    aetherGO.transform.parent = spellAnchor;
+                    aetherGO.transform.position = pt;
+                }
+                break;
+        }
+
+        // Clear the selectedElements; they're consumed by the spell
+        ClearElements();
+    }
+
 
     // Walk to a specific position. The position.z is always 0
     public void WalkTo(Vector3 xTarget)
     {
-        walkTarget = xTarget;    // Set the point to walk to
-        walkTarget.z = 0;        // Force z=0
-        walking = true;          // Now the Mage is walking
-        Face(walkTarget);        // Look in the direction of the walkTarget
+        walkTarget = xTarget;// Set the point to walk to
+        walkTarget.z = 0;  // Force z=0
+        walking = true; // Now the Mage is walking
+        Face(walkTarget); // Look in the direction of the walkTarget
     }
 
     public void Face(Vector3 poi)
     { // Face toward a point of interest
         Vector3 delta = poi - pos; // Find vector to the point of interest
-        // Use Atan2 to get the rotation around Z that points the X-axis of
-        //  _Mage:CharacterTrans toward poi
+        // Use Atan2 to get the rotation around Z that points the X-axis of _Mage:CharacterTrans toward poi
         float rZ = Mathf.Rad2Deg * Mathf.Atan2(delta.y, delta.x);
         // Set the rotation of characterTrans (doesn't actually rotate _Mage)
         characterTrans.rotation = Quaternion.Euler(0, 0, rZ);
@@ -284,7 +443,7 @@ public class Mage : PT_MonoBehaviour
         {
             if (ti.height > 0)
             { // If ti.height is > 0
-                // Then this ti is a wall, and Mage should stop
+  // Then this ti is a wall, and Mage should stop
                 StopWalking();
             }
         }
@@ -296,4 +455,154 @@ public class Mage : PT_MonoBehaviour
         GameObject go = Instantiate(tapIndicatorPrefab) as GameObject;
         go.transform.position = loc;
     }
+    // Chooses an Element_Sphere of elType and adds it to selectedElements
+    public void SelectElement(ElementType elType)
+    {
+        if (elType == ElementType.none)
+        {    // If it's the none element...
+            ClearElements(); //  then clear all Elements
+            return;  //  and return
+        }
+
+        if (maxNumSelectedElements == 1)
+        {
+            // If only one can be selected, clear the existing one...
+            ClearElements(); // ...so it can be replaced
+        }
+
+        // Can't select more than maxNumSelectedElements simultaneously
+        if (selectedElements.Count >= maxNumSelectedElements) return;
+
+        // It's okay to add this element
+        GameObject go = Instantiate(elementPrefabs[(int)elType]) as GameObject;
+        // ^ Note the typecast from ElementType to int in the line above
+        Element el = go.GetComponent<Element>();
+        el.transform.parent = this.transform;
+
+        selectedElements.Add(el); // Add el to the list of selectedElements
+    }
+
+    // Clears all elements from selectedElements and destroys their GameObjects
+    public void ClearElements()
+    {
+        foreach (Element el in selectedElements)
+        {
+            // Destroy each GameObject in the list
+            Destroy(el.gameObject);
+        }
+        selectedElements.Clear(); // and clear the list
+    }
+
+    // Called every Update() to orbit the elements around
+    void OrbitSelectedElements()
+    {
+        // If there are none selected, just return
+        if (selectedElements.Count == 0) return;
+
+        Element el;
+        Vector3 vec;
+        float theta0, theta;
+        float tau = Mathf.PI * 2; // tau is 360 in radians (i.e. 6.283...)
+
+        // Divide the circle into the number of elements that are orbiting
+        float rotPerElement = tau / selectedElements.Count;
+
+        // The base rotation angle (theta0) is set based on time
+        theta0 = elementRotSpeed * Time.time * tau;
+
+        for (int i = 0; i < selectedElements.Count; i++)
+        {
+            // Determine the rotation angle for each element
+            theta = theta0 + i * rotPerElement;
+            el = selectedElements[i];
+            // Use simple trigonometry to turn the angle into a unit vector
+            vec = new Vector3(Mathf.Cos(theta), Mathf.Sin(theta), 0);
+            // Multiply that unit vector by the elementRotDist
+            vec *= elementRotDist;
+            // Raise the element to waist height.
+            vec.z = -0.5f;
+            el.lPos = vec; // Set the position of the Element_Sphere
+        }
+    }
+    //---------------- LineRenderer Code ----------------//
+    // Add a new point to the line.
+    void AddPointToLiner(Vector3 pt)
+    {
+        pt.z = lineZ; // Set the z of the pt to lineZ to elevate it slightly above the ground
+
+        // Always add the point if linePts is empty...
+        if (linePts.Count == 0)
+        {
+            linePts.Add(pt);
+            totalLineLength = 0;
+            return;
+        }
+
+        // If the line is too long already, return
+        if (totalLineLength > lineMaxLength) return;
+
+        // If there is a previous point (pt0), then find how far pt is from it
+        Vector3 pt0 = linePts[linePts.Count - 1]; // Get the last point in linePts
+        Vector3 dir = pt - pt0;
+        float delta = dir.magnitude;
+        dir.Normalize();
+
+        totalLineLength += delta;
+
+        // If it's less than the min distance
+        if (delta < lineMinDelta)
+        {
+            //then it's too close; don't add it
+            return;
+        }
+
+        // If it's further than the max distance then extra points...
+        if (delta > lineMaxDelta)
+        {
+            // then add extra points in between
+            float numToAdd = Mathf.Ceil(delta / lineMaxDelta);
+            float midDelta = delta / numToAdd;
+            Vector3 ptMid;
+            for (int i = 1; i < numToAdd; i++)
+            {
+                ptMid = pt0 + (dir * midDelta * i);
+                linePts.Add(ptMid);
+            }
+        }
+
+        linePts.Add(pt); // Add the point
+        UpdateLiner(); // And finally update the line
+
+    }
+
+    // Update the LineRenderer with the new points
+    public void UpdateLiner()
+    {
+        // Get the type of the selectedElement
+        int el = (int)selectedElements[0].type;
+
+        // Set the line color based on that type
+        liner.SetColors(elementColors[el], elementColors[el]);
+
+        // Update the representation of the ground spell about to be cast
+        liner.SetVertexCount(linePts.Count);  // Set the number of vertices
+        for (int i = 0; i < linePts.Count; i++)
+        {
+            liner.SetPosition(i, linePts[i]); // Set each vertex
+        }
+        liner.enabled = true; // Enable the LineRenderer
+    }
+
+    public void ClearLiner()
+    {
+        liner.enabled = false;  // Disable the LineRenderer
+        linePts.Clear(); // and clear all linePts
+    }
+
+    // Stop any active drag or other mouse input
+    public void ClearInput()
+    {
+        mPhase = MPhase.idle;
+    }
+
 }
