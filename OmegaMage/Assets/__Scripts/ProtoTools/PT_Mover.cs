@@ -125,11 +125,11 @@ public class PT_Loc {
 		// Create locsL, which is all but the last element of locs
 		// e.g. if locs = [0,1,2,3,4] then locsL = [0,1,2,3]
 		PT_Loc[] locsL = new PT_Loc[len];
-		PT_Loc[].Copy(locs, 0, locsL, 0, len);
+		System.Array.Copy(locs, 0, locsL, 0, len);
 		// Create locsR, which is all but the 0th element of locs
 		// e.g. if locs = [0,1,2,3,4] then locsR = [1,2,3,4]
 		PT_Loc[] locsR = new PT_Loc[len];
-		PT_Loc[].Copy(locs, 1, locsR, 0, len);
+		System.Array.Copy(locs, 1, locsR, 0, len);
 
 		// The result is the Lerp of these two shorter Lists
 		PT_Loc res = Lerp( Bezier(u, locsL), Bezier(u, locsR), u );
