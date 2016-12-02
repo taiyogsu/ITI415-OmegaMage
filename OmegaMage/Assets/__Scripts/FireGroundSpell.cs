@@ -62,7 +62,7 @@ public class FireGroundSpell : PT_MonoBehaviour
         // If there is an EnemyBug component, dmage it with fire
         if (recipient != null)
         {
-            recipient.Damage(damagePerSecond, true);
+            recipient.Damage(damagePerSecond, ElementType.fire, true);
         }
     }
 

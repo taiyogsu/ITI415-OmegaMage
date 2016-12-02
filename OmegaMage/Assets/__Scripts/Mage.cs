@@ -280,14 +280,14 @@ public class Mage : PT_MonoBehaviour
 
         // Now this cares what was tapped
         switch (actionStartTag) {
-        case "Mage":
-            // Do nothing
-            break;
-        case "Ground":
-            // Move to tapped point @ z=0 whether or not an element is selected
-            WalkTo(lastMouseInfo.loc); // Walk to the first mouseInfo pos
-            ShowTap(lastMouseInfo.loc); // Show where the player tapped
-            break;
+            case "Mage":
+                // Do nothing
+                break;
+            case "Ground":
+                // Move to tapped point @ z=0 whether or not an element is selected
+                WalkTo(lastMouseInfo.loc); // Walk to the first mouseInfo pos
+                ShowTap(lastMouseInfo.loc); // Show where the player tapped
+                break;
         }
     }
 
@@ -347,7 +347,7 @@ public class Mage : PT_MonoBehaviour
             case ElementType.earth:
                 GameObject earthGO;
                 foreach (Vector3 pt in linePts)
-                { 
+                {
                     earthGO = Instantiate(earthGroundSpellPrefab) as GameObject;
                     earthGO.transform.parent = spellAnchor;
                     earthGO.transform.position = pt;
@@ -357,7 +357,7 @@ public class Mage : PT_MonoBehaviour
             case ElementType.water:
                 GameObject waterGO;
                 foreach (Vector3 pt in linePts)
-                { 
+                {
                     waterGO = Instantiate(waterGroundSpellPrefab) as GameObject;
                     waterGO.transform.parent = spellAnchor;
                     waterGO.transform.position = pt;
@@ -367,7 +367,7 @@ public class Mage : PT_MonoBehaviour
             case ElementType.air:
                 GameObject airGO;
                 foreach (Vector3 pt in linePts)
-                { 
+                {
                     airGO = Instantiate(airGroundSpellPrefab) as GameObject;
                     airGO.transform.parent = spellAnchor;
                     airGO.transform.position = pt;
@@ -377,7 +377,7 @@ public class Mage : PT_MonoBehaviour
             case ElementType.fire:
                 GameObject fireGO;
                 foreach (Vector3 pt in linePts)
-                { 
+                {
                     fireGO = Instantiate(fireGroundSpellPrefab) as GameObject;
                     fireGO.transform.parent = spellAnchor;
                     fireGO.transform.position = pt;
@@ -387,7 +387,7 @@ public class Mage : PT_MonoBehaviour
             case ElementType.aether:
                 GameObject aetherGO;
                 foreach (Vector3 pt in linePts)
-                { 
+                {
                     aetherGO = Instantiate(aetherGroundSpellPrefab) as GameObject;
                     aetherGO.transform.parent = spellAnchor;
                     aetherGO.transform.position = pt;
@@ -485,18 +485,28 @@ public class Mage : PT_MonoBehaviour
         {
             if (ti.height > 0)
             { // If ti.height is > 0
-    // Then this is a wall, and Mage should stop
+              // Then this is a wall, and Mage should stop
                 StopWalking();
             }
         }
         // See if it's an EnemyBug
         EnemyBug bug = coll.gameObject.GetComponent<EnemyBug>();
-        // If otherGO is an EnemyBug, pass otherGO to CollisionDamage()
-        if (bug != null) CollisionDamage(otherGO);
-
+        // If otherGO is an EnemyBug, pass bug to CollisionDamage(), which willinterpret it as an Enemy
+        if (bug != null) CollisionDamage(bug);
+        // if (bug != null) CollisionDamage(otherGO);
     }
 
-    void CollisionDamage(GameObject enemy)
+    void OnTriggerEnter(Collider other)
+    {
+        EnemySpiker spiker = other.GetComponent<EnemySpiker>();
+        if (spiker != null)
+        {
+            // CollisionDamage() will see spiker as an Enemy
+            CollisionDamage(spiker);
+        }
+    }
+
+    void CollisionDamage(Enemy enemy)
     {
 
         // Don't take damage if you're already invincible
@@ -505,7 +515,8 @@ public class Mage : PT_MonoBehaviour
         // The Mage has been hit by an enemy
         StopWalking();
         ClearInput();
-        health -= 1; // Take 1 point of damage (for now)
+
+        health -= enemy.touchDamage; // Take 1 point of damage (for now)
         if (health <= 0)
         {
             Die();
@@ -514,7 +525,7 @@ public class Mage : PT_MonoBehaviour
 
         damageTime = Time.time;
         knockbackBool = true;
-        knockbackDir = (pos - enemy.transform.position).normalized;
+        knockbackDir = (pos - enemy.pos).normalized;
         invincibleBool = true;
     }
 
