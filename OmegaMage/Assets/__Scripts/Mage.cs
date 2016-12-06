@@ -80,7 +80,8 @@ public class Mage : PT_MonoBehaviour
     public GameObject fireGroundSpellPrefab;
     public GameObject aetherGroundSpellPrefab;
 
-    public float health = 4; // Total mage health
+    public float health = 10; // Total mage health
+    private float _maxHealth;
     public float damageTime = -100;
     // ^ Time that damage occurred. It's set to -100 so that the Mage doesn't
     //    act damaged immediately when the scene starts
@@ -97,6 +98,19 @@ public class Mage : PT_MonoBehaviour
     private Transform viewCharacterTrans;
 
     protected Transform spellAnchor; // The parent transform for all spells
+    public Dictionary<ElementType, float> damageDict;
+
+    void ResetDamageDict()
+    {
+        if (damageDict == null)
+        {
+            damageDict = new Dictionary<ElementType, float>();
+        }
+        damageDict.Clear();        
+        damageDict.Add(ElementType.air, 0);
+        damageDict.Add(ElementType.aether, 0);
+        damageDict.Add(ElementType.none, 0);
+    }
 
 
     public float totalLineLength;
@@ -128,11 +142,14 @@ public class Mage : PT_MonoBehaviour
         liner = GetComponent<LineRenderer>();
         liner.enabled = false;
 
+        _maxHealth = health; // Used to put a top cap on healing
 
         GameObject saGO = new GameObject("Spell Anchor");
         // ^ Create an empty GameObject named "Spell Anchor". When you create a
         //    new GameObject this way, it's at P:[0,0,0] R:[0,0,0] S:[1,1,1]
         spellAnchor = saGO.transform; // Get its transform
+        ResetDamageDict();
+
     }
 
     void Update()
@@ -489,6 +506,7 @@ public class Mage : PT_MonoBehaviour
                 StopWalking();
             }
         }
+        
         // See if it's an EnemyBug
         EnemyBug bug = coll.gameObject.GetComponent<EnemyBug>();
         // If otherGO is an EnemyBug, pass bug to CollisionDamage(), which willinterpret it as an Enemy
@@ -504,7 +522,11 @@ public class Mage : PT_MonoBehaviour
             // CollisionDamage() will see spiker as an Enemy
             CollisionDamage(spiker);
         }
+
+
     }
+
+
 
     void CollisionDamage(Enemy enemy)
     {
@@ -529,8 +551,13 @@ public class Mage : PT_MonoBehaviour
         invincibleBool = true;
     }
 
-    // The Mage dies
-    void Die()
+    public void Heal(float amt, ElementType eT, bool damageOverTime = false)
+    { // If it's DOT, then only damage the fractional amount for this frame      
+                damageDict[eT] = -Mathf.Max(amt, damageDict[eT]);        
+    }
+
+        // The Mage dies
+        void Die()
     {
        SceneManager.LoadScene(0); // Reload the level
         // ^ Eventually, you'll want to do something more elegant
@@ -691,6 +718,30 @@ public class Mage : PT_MonoBehaviour
     public void ClearInput()
     {
         mPhase = MPhase.idle;
+    }
+
+
+    void LateUpdate()
+    {
+        // Apply damage from the different element types
+
+        // Iteration through a Dictionary uses a KeyValuePair
+        // entry.Key is the ElementType, while entry.Value is the float
+        float dmg = 0;
+        foreach (KeyValuePair<ElementType, float> entry in damageDict)
+        {
+            dmg += entry.Value;
+        }
+
+        health -= dmg;
+        health = Mathf.Min(_maxHealth, health); // Limit health if healing
+
+        ResetDamageDict(); // Prepare for next frame
+
+        if (health <= 0)
+        {
+            Die();
+        }
     }
 
 }

@@ -137,7 +137,8 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
                 break;
 
             case ElementType.aether:
-                // aeter doesn't damage EnemyBugs, so do nothing
+                damageDict[eT] = -Mathf.Max(amt, damageDict[eT]);
+
                 break;
 
             case ElementType.water:

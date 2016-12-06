@@ -5,12 +5,12 @@ using System.Collections;
 public class AetherGroundSpell : PT_MonoBehaviour
 {
 
-    public float duration = 1; // Lifetime of this GameObject
+    public float duration = 2; // Lifetime of this GameObject
     public float durationVariance = 0.5f;
     // ^ This allows the duration to range from 3.5 to 4.5
     public float fadeTime = 1f; // Length of time to fade
     public float timeStart; // Birth time of this GameObject
-    public float damagePerSecond = 18;
+    public float damagePerSecond = 2;
 
     // Use this for initialization
     void Start()
@@ -58,11 +58,12 @@ public class AetherGroundSpell : PT_MonoBehaviour
     {
         // Actually damage the other
         // Get a reference to the EnemyBug script component of the other
-        EnemyBug recipient = other.GetComponent<EnemyBug>();
-        // If there is an EnemyBug component, dmage it with earth
-        if (recipient != null)
+        Mage mage = other.GetComponent<Mage>();
+
+        // If there is an EnemyBug component, heal
+        if (mage != null)
         {
-            recipient.Damage(damagePerSecond, ElementType.aether, true);
+            mage.Heal(damagePerSecond, ElementType.aether, true);
         }
     }
 
