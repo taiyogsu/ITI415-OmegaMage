@@ -20,12 +20,18 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
 
     public string roomXMLString;
 
-    public float speed = 0.5f;
+    public float speed = 1.1f;
     public float health = 10;
     public float damageScale = 0.8f;
     public float damageScaleDuration = 0.25f;
 
     public bool ________________;
+    public float knockbackDist = 1;    // Distance to move backward
+    public float knockbackDur = 0.5f;  // Seconds to move backward
+    private bool knockbackBool = false; // Mage being knocked back?
+    private Vector3 knockbackDir; // Direction of knockback
+
+
 
     private float damageScaleStartTime;
     private float _maxHealth;
@@ -94,6 +100,14 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
 
     void FixedUpdate()
     { // Happens every physics step (i.e., 50 times/second)
+
+        if (knockbackBool)
+        {
+            float knockbackSpeed = knockbackDist / knockbackDur;
+            vel = knockbackDir * knockbackSpeed;
+            return; // Returns to avoid walking code below
+        }
+
         if (walking)
         { // If EnemyBug is walking
             if ((walkTarget - pos).magnitude < speed * Time.fixedDeltaTime)
@@ -134,6 +148,8 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
 
             case ElementType.air:
                 // air doesn't damage EnemyBugs, so do nothing
+                walking = false;
+
                 break;
 
             case ElementType.aether:
@@ -149,6 +165,7 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
             case ElementType.earth:
                 // Only the max damage from one earth source affects this instance
                 damageDict[eT] = Mathf.Max(amt, damageDict[eT]);
+                speed = 0.3f;         
                 break;
 
 

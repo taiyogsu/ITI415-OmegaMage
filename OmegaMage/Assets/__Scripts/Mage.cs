@@ -61,7 +61,7 @@ public class Mage : PT_MonoBehaviour
 
     public float activeScreenWidth = 1; // % of the screen to use
 
-    public float speed = 2; // The speed at which _Mage walks
+    public float speed = 5; // The speed at which _Mage walks
 
     public GameObject[] elementPrefabs; // The Element_Sphere Prefabs
     public float elementRotDist = 0.5f; // Radius of rotation
@@ -80,7 +80,7 @@ public class Mage : PT_MonoBehaviour
     public GameObject fireGroundSpellPrefab;
     public GameObject aetherGroundSpellPrefab;
 
-    public float health = 10; // Total mage health
+    public float health = 5; // Total mage health
     private float _maxHealth;
     public float damageTime = -100;
     // ^ Time that damage occurred. It's set to -100 so that the Mage doesn't
