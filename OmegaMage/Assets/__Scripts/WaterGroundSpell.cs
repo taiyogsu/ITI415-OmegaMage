@@ -5,7 +5,7 @@ using System.Collections;
 public class WaterGroundSpell : PT_MonoBehaviour
 {
 
-    public float duration = 5; // Lifetime of this GameObject
+    public float duration = 3; // Lifetime of this GameObject
     public float durationVariance = 0.5f;
     // ^ This allows the duration to range from 3.5 to 4.5
     public float fadeTime = 1f; // Length of time to fade

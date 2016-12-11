@@ -100,6 +100,8 @@ public class Mage : PT_MonoBehaviour
     protected Transform spellAnchor; // The parent transform for all spells
     public Dictionary<ElementType, float> damageDict;
 
+    public AudioClip damageTaken;
+
     void ResetDamageDict()
     {
         if (damageDict == null)
@@ -144,6 +146,7 @@ public class Mage : PT_MonoBehaviour
 
         _maxHealth = health; // Used to put a top cap on healing
 
+
         GameObject saGO = new GameObject("Spell Anchor");
         // ^ Create an empty GameObject named "Spell Anchor". When you create a
         //    new GameObject this way, it's at P:[0,0,0] R:[0,0,0] S:[1,1,1]
@@ -154,6 +157,7 @@ public class Mage : PT_MonoBehaviour
 
     void Update()
     {
+
         // Find whether the mouse button 0 was pressed or released this frame
         bool b0Down = Input.GetMouseButtonDown(0);
         bool b0Up = Input.GetMouseButtonUp(0);
@@ -549,7 +553,11 @@ public class Mage : PT_MonoBehaviour
         knockbackBool = true;
         knockbackDir = (pos - enemy.pos).normalized;
         invincibleBool = true;
+
+        GetComponent<AudioSource>().clip = damageTaken;
+        GetComponent<AudioSource>().Play();
     }
+
 
     public void Heal(float amt, ElementType eT, bool damageOverTime = false)
     { // If it's DOT, then only damage the fractional amount for this frame      

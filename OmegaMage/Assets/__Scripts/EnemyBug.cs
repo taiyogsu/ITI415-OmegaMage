@@ -26,12 +26,6 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
     public float damageScaleDuration = 0.25f;
 
     public bool ________________;
-    public float knockbackDist = 1;    // Distance to move backward
-    public float knockbackDur = 0.5f;  // Seconds to move backward
-    private bool knockbackBool = false; // Mage being knocked back?
-    private Vector3 knockbackDir; // Direction of knockback
-
-
 
     private float damageScaleStartTime;
     private float _maxHealth;
@@ -101,13 +95,7 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
     void FixedUpdate()
     { // Happens every physics step (i.e., 50 times/second)
 
-        if (knockbackBool)
-        {
-            float knockbackSpeed = knockbackDist / knockbackDur;
-            vel = knockbackDir * knockbackSpeed;
-            return; // Returns to avoid walking code below
-        }
-
+       
         if (walking)
         { // If EnemyBug is walking
             if ((walkTarget - pos).magnitude < speed * Time.fixedDeltaTime)
@@ -196,7 +184,7 @@ public class EnemyBug : PT_MonoBehaviour, Enemy
             if (characterTrans.localScale == Vector3.one)// start the damage scale animation
             {
                 damageScaleStartTime = Time.time;
-            }
+            }                       
         }
 
         // the damage scale animation
